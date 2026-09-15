@@ -1,100 +1,115 @@
-
-def input_error(func):
-    def inner(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except ValueError:
-            return "Give me name and phone please."
-        except KeyError:
-            return "Contact not found."
-        except IndexError:
-            return "Enter user name."
-
-    return inner
+import sys
+from pathlib import Path
 
 
-def parse_input(user_input):
-    cmd, *args = user_input.strip().split()
-    cmd = cmd.lower()
-    return cmd, args
+def parse_log_line(line: str) -> dict:
+    parts = line.strip().split(" ", 3)
+
+    if len(parts) != 4:
+        raise ValueError(f"Invalid log line format: {line.strip()}")
+
+    date, time, level, message = parts
+
+    return {
+        "date": date,
+        "time": time,
+        "level": level,
+        "message": message,
+    }
 
 
-@input_error
-def add_contact(args, contacts):
-    name, phone = args
-    contacts[name] = phone
-    return "Contact added."
+def load_logs(file_path: str) -> list:
+    logs = []
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file:
+            for line in file:
+                if not line.strip():
+                    continue
+
+                try:
+                    logs.append(parse_log_line(line))
+                except ValueError as error:
+                    print(f"Skipped invalid line: {error}")
+
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return []
+
+    except OSError as error:
+        print(f"Error reading file: {error}")
+        return []
+
+    return logs
 
 
-@input_error
-def change_contact(args, contacts):
-    name, phone = args
+def filter_logs_by_level(logs: list, level: str) -> list:
+    level = level.upper()
 
-    if name not in contacts:
-        raise KeyError
-
-    contacts[name] = phone
-    return "Contact updated."
-
-
-@input_error
-def show_phone(args, contacts):
-    name = args[0]
-
-    if name not in contacts:
-        raise KeyError
-
-    return contacts[name]
+    return list(
+        filter(
+            lambda log: log["level"] == level,
+            logs,
+        )
+    )
 
 
-@input_error
-def show_all(contacts):
-    if not contacts:
-        return "No contacts found."
+def count_logs_by_level(logs: list) -> dict:
+    counts = {}
 
-    result = []
+    for log in logs:
+        level = log["level"]
+        counts[level] = counts.get(level, 0) + 1
 
-    for name, phone in contacts.items():
-        result.append(f"{name}: {phone}")
+    return counts
 
-    return "\n".join(result)
+
+def display_log_counts(counts: dict) -> None:
+    print("Рівень логування | Кількість")
+    print("-----------------|----------")
+
+    for level in ["INFO", "DEBUG", "ERROR", "WARNING"]:
+        print(f"{level:<16} | {counts.get(level, 0)}")
+
+
+def display_logs(logs: list, level: str) -> None:
+    filtered_logs = filter_logs_by_level(logs, level)
+
+    if not filtered_logs:
+        print(f"\nДеталі логів для рівня '{level.upper()}':")
+        print("Записів не знайдено.")
+        return
+
+    print(f"\nДеталі логів для рівня '{level.upper()}':")
+
+    for log in filtered_logs:
+        print(
+            f"{log['date']} {log['time']} - {log['message']}"
+        )
 
 
 def main():
-    contacts = {}
+    if len(sys.argv) < 2:
+        print("Usage: python homework5c.py <log_file> [level]")
+        return
 
-    print("Welcome to the assistant bot!")
+    file_path = sys.argv[1]
 
-    while True:
-        user_input = input("Enter a command: ")
+    if not Path(file_path).exists():
+        print(f"File not found: {file_path}")
+        return
 
-        if not user_input.strip():
-            print("Enter a command.")
-            continue
+    logs = load_logs(file_path)
 
-        command, args = parse_input(user_input)
+    if not logs:
+        return
 
-        if command in ["close", "exit"]:
-            print("Good bye!")
-            break
+    counts = count_logs_by_level(logs)
+    display_log_counts(counts)
 
-        elif command == "hello":
-            print("How can I help you?")
-
-        elif command == "add":
-            print(add_contact(args, contacts))
-
-        elif command == "change":
-            print(change_contact(args, contacts))
-
-        elif command == "phone":
-            print(show_phone(args, contacts))
-
-        elif command == "all":
-            print(show_all(contacts))
-
-        else:
-            print("Invalid command.")
+    if len(sys.argv) >= 3:
+        level = sys.argv[2]
+        display_logs(logs, level)
 
 
 if __name__ == "__main__":

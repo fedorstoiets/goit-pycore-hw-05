@@ -3,10 +3,10 @@ from typing import Callable, Generator
 
 
 def generator_numbers(text: str) -> Generator[float, None, None]:
-    pattern = r"\b\d+\.\d+\b"
+    pattern = r"(?<=\s)\d+(?:\.\d+)?(?=\s)"
 
-    for number in re.findall(pattern, text):
-        yield float(number)
+    for match in re.finditer(pattern, text):
+        yield float(match.group())
 
 
 def sum_profit(text: str, func: Callable) -> float:
@@ -22,4 +22,3 @@ text = (
 total_income = sum_profit(text, generator_numbers)
 
 print(f"Загальний дохід: {total_income}")
-
